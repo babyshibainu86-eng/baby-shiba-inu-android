@@ -1,443 +1,569 @@
-document.addEventListener("DOMContentLoaded", () => {
+document.addEventListener("DOMContentLoaded", function () {
+    "use strict";
 
-    // =========================
-    // BABY SHIBA INU
-    // ANDROID COPY
-    // =========================
+    /* =========================================
+       TELEGRAM WEB APP
+    ========================================= */
 
-    let balance = 0;
-    let totalMined = 0;
-    let energy = 1000;
-    let maxEnergy = 1000;
+    const tg =
+        window.Telegram &&
+        window.Telegram.WebApp
+            ? window.Telegram.WebApp
+            : null;
 
-    let level = 1;
-    let xp = 0;
-    let tapPower = 1;
-    let vipLevel = 0;
+    if (tg) {
+        try {
+            tg.ready();
+            tg.expand();
+        } catch (e) {
+            console.log("Telegram:", e);
+        }
+    }
 
-    let miningRate = 1;
+    /* =========================================
+       STORAGE
+    ========================================= */
 
-    // -------------------------
-    // ELEMENTS
-    // -------------------------
+    const STORAGE_KEY = "babyShibaMiningGame";
 
-    const introPage = document.getElementById("introPage");
-    const gameApp = document.getElementById("gameApp");
-    const startGame = document.getElementById("startGame");
+    let game = {
+        balance: 0,
+        totalMined: 0,
+        level: 1,
+        xp: 0,
+        tapPower: 1,
+        mineRate: 1,
+        energy: 1000,
+        maxEnergy: 1000,
+        vipLevel: 0,
+        lastDailyReward: 0
+    };
 
-    const shibaButton = document.getElementById("shibaButton");
+    /* =========================================
+       VIP DATA
+    ========================================= */
 
-    const balanceEl = document.getElementById("balance");
-    const totalMinedEl = document.getElementById("totalMined");
+    const VIP = {
+        0: {
+            mining: 0,
+            energy: 0
+        },
+        1: {
+            mining: 5,
+            energy: 100
+        },
+        2: {
+            mining: 10,
+            energy: 200
+        },
+        3: {
+            mining: 15,
+            energy: 300
+        },
+        4: {
+            mining: 25,
+            energy: 500
+        },
+        5: {
+            mining: 50,
+            energy: 1000
+        }
+    };
 
-    const energyEl = document.getElementById("energy");
-    const maxEnergyEl = document.getElementById("maxEnergy");
-    const energyFill = document.getElementById("energyFill");
+    const VIP_PRICES = {
+        1: 10000,
+        2: 50000,
+        3: 150000,
+        4: 400000,
+        5: 1000000
+    };
 
-    const levelEl = document.getElementById("levelValue");
-    const tapPowerEl = document.getElementById("tapPower");
+    /* =========================================
+       LOAD GAME
+    ========================================= */
 
-    const xpValueEl = document.getElementById("xpValue");
-    const xpTextEl = document.getElementById("xpText");
-    const xpFill = document.getElementById("xpFill");
+    function loadGame() {
+        try {
+            const saved = localStorage.getItem(STORAGE_KEY);
 
-    const mineRateEl = document.getElementById("mineRate");
-    const vipLevelEl = document.getElementById("vipLevel");
+            if (saved) {
+                const parsed = JSON.parse(saved);
 
-    const currentVipLevelEl =
-        document.getElementById("currentVipLevel");
+                game = {
+                    ...game,
+                    ...parsed
+                };
+            }
+        } catch (e) {
+            console.log("Load game error:", e);
+        }
 
-    const vipMiningBonusEl =
-        document.getElementById("vipMiningBonus");
+        if (!Number.isFinite(game.balance)) {
+            game.balance = 0;
+        }
 
-    const vipEnergyBonusEl =
-        document.getElementById("vipEnergyBonus");
+        if (!Number.isFinite(game.totalMined)) {
+            game.totalMined = 0;
+        }
 
-    const playerNameEl =
-        document.getElementById("playerName");
+        if (!Number.isFinite(game.level) || game.level < 1) {
+            game.level = 1;
+        }
 
-    const playerIdEl =
-        document.getElementById("playerId");
+        if (!Number.isFinite(game.xp) || game.xp < 0) {
+            game.xp = 0;
+        }
 
-    const toastEl =
-        document.getElementById("toast");
+        if (!Number.isFinite(game.tapPower) || game.tapPower < 1) {
+            game.tapPower = 1;
+        }
 
+        if (!Number.isFinite(game.mineRate) || game.mineRate < 1) {
+            game.mineRate = 1;
+        }
 
-    // -------------------------
-    // TELEGRAM
-    // -------------------------
+        if (!Number.isFinite(game.vipLevel) || game.vipLevel < 0) {
+            game.vipLevel = 0;
+        }
 
-    let tg = null;
+        if (!Number.isFinite(game.lastDailyReward)) {
+            game.lastDailyReward = 0;
+        }
 
-    try {
+        const vip = getVIP();
+
+        game.maxEnergy = 1000 + vip.energy;
+
+        if (!Number.isFinite(game.energy)) {
+            game.energy = game.maxEnergy;
+        }
+
+        game.energy = Math.min(game.energy, game.maxEnergy);
+    }
+
+    /* =========================================
+       SAVE GAME
+    ========================================= */
+
+    function saveGame() {
+        try {
+            localStorage.setItem(
+                STORAGE_KEY,
+                JSON.stringify(game)
+            );
+        } catch (e) {
+            console.log("Save game error:", e);
+        }
+    }
+
+    /* =========================================
+       TELEGRAM USER
+    ========================================= */
+
+    function loadTelegramUser() {
+        let user = null;
 
         if (
-            window.Telegram &&
-            window.Telegram.WebApp
+            tg &&
+            tg.initDataUnsafe &&
+            tg.initDataUnsafe.user
         ) {
-
-            tg = window.Telegram.WebApp;
-
-            tg.ready();
-
-            if (tg.expand) {
-                tg.expand();
-            }
-
-            if (
-                tg.initDataUnsafe &&
-                tg.initDataUnsafe.user
-            ) {
-
-                const user =
-                    tg.initDataUnsafe.user;
-
-                if (playerNameEl) {
-
-                    playerNameEl.textContent =
-                        user.first_name ||
-                        user.username ||
-                        "Player";
-
-                }
-
-                if (playerIdEl) {
-
-                    playerIdEl.textContent =
-                        user.id || "---";
-
-                }
-
-            }
-
+            user = tg.initDataUnsafe.user;
         }
 
-    } catch (error) {
+        const playerName = document.getElementById("playerName");
+        const playerId = document.getElementById("playerId");
 
-        console.log(
-            "Telegram WebApp not available."
-        );
-
-    }
-
-
-    // -------------------------
-    // START GAME
-    // -------------------------
-
-    function startGameNow() {
-
-        if (introPage) {
-
-            introPage.classList.add("hidden");
-
-        }
-
-        if (gameApp) {
-
-            gameApp.classList.remove("hidden");
-
-        }
-
-        updateScreen();
-
-    }
-
-
-    if (startGame) {
-
-        startGame.addEventListener(
-            "click",
-            startGameNow
-        );
-
-    }
-
-
-    // -------------------------
-    // MINING
-    // -------------------------
-
-    function mine() {
-
-        if (energy <= 0) {
-
-            showToast(
-                "⚡ Not enough energy"
-            );
-
+        if (!playerName || !playerId) {
             return;
-
         }
 
-        balance += tapPower;
+        if (user) {
+            const firstName = user.first_name || "";
+            const lastName = user.last_name || "";
 
-        totalMined += tapPower;
+            const fullName =
+                `${firstName} ${lastName}`.trim();
 
-        energy -= 1;
+            playerName.textContent =
+                fullName ||
+                user.username ||
+                "Player";
 
-        xp += tapPower;
-
-        checkLevel();
-
-        updateScreen();
-
+            playerId.textContent =
+                user.id
+                    ? `ID: ${user.id}`
+                    : "Player ID";
+        } else {
+            playerName.textContent = "Baby Shiba Player";
+            playerId.textContent = "Android Player";
+        }
     }
 
+    /* =========================================
+       XP / LEVEL
+    ========================================= */
 
-    if (shibaButton) {
-
-        shibaButton.addEventListener(
-            "click",
-            mine
-        );
-
+    function xpNeeded() {
+        return game.level * 100;
     }
 
+    function addXP(amount) {
+        game.xp += amount;
 
-    // -------------------------
-    // LEVEL
-    // -------------------------
-
-    function checkLevel() {
-
-        const requiredXP =
-            level * 100;
-
-        if (xp >= requiredXP) {
-
-            xp -= requiredXP;
-
-            level++;
+        while (game.xp >= xpNeeded()) {
+            game.xp -= xpNeeded();
+            game.level += 1;
 
             showToast(
-                "⭐ Level Up!"
+                `🎉 Level Up! Level ${game.level}`
             );
-
         }
-
     }
 
+    /* =========================================
+       VIP
+    ========================================= */
 
-    // -------------------------
-    // ENERGY REGEN
-    // -------------------------
+    function getVIP() {
+        return VIP[game.vipLevel] || VIP[0];
+    }
 
-    setInterval(() => {
+    function updateVIP() {
+        const vip = getVIP();
 
-        if (energy < maxEnergy) {
+        game.maxEnergy = 1000 + vip.energy;
 
-            energy++;
-
-            updateScreen();
-
+        if (game.energy > game.maxEnergy) {
+            game.energy = game.maxEnergy;
         }
 
-    }, 1000);
+        const vipLevel =
+            document.getElementById("vipLevel");
 
+        const currentVipLevel =
+            document.getElementById("currentVipLevel");
 
-    // -------------------------
-    // SCREEN UPDATE
-    // -------------------------
+        const vipMiningBonus =
+            document.getElementById("vipMiningBonus");
 
-    function updateScreen() {
+        const vipEnergyBonus =
+            document.getElementById("vipEnergyBonus");
 
-        if (balanceEl) {
-
-            balanceEl.textContent =
-                formatNumber(balance);
-
+        if (vipLevel) {
+            vipLevel.textContent =
+                game.vipLevel;
         }
 
-        if (totalMinedEl) {
-
-            totalMinedEl.textContent =
-                formatNumber(totalMined);
-
+        if (currentVipLevel) {
+            currentVipLevel.textContent =
+                game.vipLevel;
         }
 
-        if (energyEl) {
-
-            energyEl.textContent =
-                Math.floor(energy);
-
+        if (vipMiningBonus) {
+            vipMiningBonus.textContent =
+                `+${vip.mining}%`;
         }
 
-        if (maxEnergyEl) {
+        if (vipEnergyBonus) {
+            vipEnergyBonus.textContent =
+                `+${vip.energy}`;
+        }
+    }
 
-            maxEnergyEl.textContent =
-                maxEnergy;
+    /* =========================================
+       NUMBER FORMAT
+    ========================================= */
 
+    function formatNumber(value) {
+        if (!Number.isFinite(value)) {
+            return "0";
         }
 
-        if (levelEl) {
-
-            levelEl.textContent =
-                level;
-
+        if (Math.abs(value) >= 1000000000) {
+            return (
+                (value / 1000000000)
+                    .toFixed(2)
+                    .replace(/\.00$/, "") +
+                "B"
+            );
         }
 
-        if (tapPowerEl) {
-
-            tapPowerEl.textContent =
-                tapPower;
-
+        if (Math.abs(value) >= 1000000) {
+            return (
+                (value / 1000000)
+                    .toFixed(2)
+                    .replace(/\.00$/, "") +
+                "M"
+            );
         }
 
-        if (xpValueEl) {
-
-            xpValueEl.textContent =
-                xp;
-
+        if (Math.abs(value) >= 1000) {
+            return (
+                (value / 1000)
+                    .toFixed(2)
+                    .replace(/\.00$/, "") +
+                "K"
+            );
         }
 
-        if (mineRateEl) {
+        return Math.floor(value).toLocaleString();
+    }
 
-            mineRateEl.textContent =
-                miningRate;
+    /* =========================================
+       UPDATE UI
+    ========================================= */
 
+    function updateUI() {
+        updateVIP();
+
+        const balance =
+            document.getElementById("balance");
+
+        const totalMined =
+            document.getElementById("totalMined");
+
+        const levelValue =
+            document.getElementById("levelValue");
+
+        const xpValue =
+            document.getElementById("xpValue");
+
+        const xpText =
+            document.getElementById("xpText");
+
+        const xpFill =
+            document.getElementById("xpFill");
+
+        const mineRate =
+            document.getElementById("mineRate");
+
+        const tapPower =
+            document.getElementById("tapPower");
+
+        const energy =
+            document.getElementById("energy");
+
+        const maxEnergy =
+            document.getElementById("maxEnergy");
+
+        const energyFill =
+            document.getElementById("energyFill");
+
+        if (balance) {
+            balance.textContent =
+                formatNumber(game.balance);
         }
 
-        if (vipLevelEl) {
-
-            vipLevelEl.textContent =
-                vipLevel;
-
+        if (totalMined) {
+            totalMined.textContent =
+                formatNumber(game.totalMined);
         }
 
-        if (currentVipLevelEl) {
-
-            currentVipLevelEl.textContent =
-                "VIP " + vipLevel;
-
+        if (levelValue) {
+            levelValue.textContent =
+                game.level;
         }
 
-        if (vipMiningBonusEl) {
-
-            vipMiningBonusEl.textContent =
-                "+" +
-                (vipLevel * 5) +
-                "%";
-
+        if (xpValue) {
+            xpValue.textContent =
+                Math.floor(game.xp);
         }
 
-        if (vipEnergyBonusEl) {
-
-            vipEnergyBonusEl.textContent =
-                "+" +
-                (vipLevel * 100);
-
+        if (xpText) {
+            xpText.textContent =
+                `${Math.floor(game.xp)} / ${xpNeeded()}`;
         }
-
-        // ENERGY BAR
-
-        if (energyFill) {
-
-            const percent =
-                (energy / maxEnergy) * 100;
-
-            energyFill.style.width =
-                percent + "%";
-
-        }
-
-        // XP BAR
 
         if (xpFill) {
-
-            const requiredXP =
-                level * 100;
-
-            const percent =
-                (xp / requiredXP) * 100;
+            const xpPercent =
+                Math.min(
+                    100,
+                    (game.xp / xpNeeded()) * 100
+                );
 
             xpFill.style.width =
-                percent + "%";
-
+                `${xpPercent}%`;
         }
 
-        if (xpTextEl) {
-
-            xpTextEl.textContent =
-                xp +
-                " / " +
-                (level * 100);
-
+        if (mineRate) {
+            mineRate.textContent =
+                `${game.mineRate}/s`;
         }
 
+        if (tapPower) {
+            tapPower.textContent =
+                game.tapPower;
+        }
+
+        if (energy) {
+            energy.textContent =
+                Math.floor(game.energy);
+        }
+
+        if (maxEnergy) {
+            maxEnergy.textContent =
+                Math.floor(game.maxEnergy);
+        }
+
+        if (energyFill) {
+            const energyPercent =
+                game.maxEnergy > 0
+                    ? (game.energy / game.maxEnergy) * 100
+                    : 0;
+
+            energyFill.style.width =
+                `${Math.max(
+                    0,
+                    Math.min(100, energyPercent)
+                )}%`;
+        }
     }
 
+    /* =========================================
+       NAVIGATION
+    ========================================= */
 
-    // -------------------------
-    // NAVIGATION
-    // -------------------------
+    function showPage(pageId) {
+        const pages =
+            document.querySelectorAll(".game-page");
 
-    const navItems =
-        document.querySelectorAll(
-            ".nav-item"
-        );
+        pages.forEach(function (page) {
+            page.classList.remove("active");
+        });
 
-    const gamePages =
-        document.querySelectorAll(
-            ".game-page"
-        );
+        const target =
+            document.getElementById(pageId);
 
+        if (target) {
+            target.classList.add("active");
+        }
 
-    navItems.forEach((button) => {
+        const navItems =
+            document.querySelectorAll(".nav-item");
 
-        button.addEventListener(
+        navItems.forEach(function (item) {
+            item.classList.remove("active");
+
+            if (
+                item.getAttribute("data-page") ===
+                pageId
+            ) {
+                item.classList.add("active");
+            }
+        });
+    }
+
+    /* =========================================
+       START GAME
+    ========================================= */
+
+    const startGame =
+        document.getElementById("startGame");
+
+    if (startGame) {
+        startGame.addEventListener(
             "click",
-            () => {
+            function () {
+                const introPage =
+                    document.getElementById("introPage");
 
-                const pageId =
-                    button.dataset.page;
+                const gameApp =
+                    document.getElementById("gameApp");
 
-                navItems.forEach(
-                    (item) => {
-
-                        item.classList.remove(
-                            "active"
-                        );
-
-                    }
-                );
-
-                button.classList.add(
-                    "active"
-                );
-
-                gamePages.forEach(
-                    (page) => {
-
-                        page.classList.remove(
-                            "active"
-                        );
-
-                    }
-                );
-
-                const target =
-                    document.getElementById(
-                        pageId
-                    );
-
-                if (target) {
-
-                    target.classList.add(
-                        "active"
-                    );
-
+                if (introPage) {
+                    introPage.style.display = "none";
                 }
 
+                if (gameApp) {
+                    gameApp.style.display = "block";
+                }
+
+                try {
+                    window.scrollTo(0, 0);
+                } catch (e) {}
+
+                updateUI();
             }
         );
+    }
 
-    });
+    /* =========================================
+       MINING / TAP
+    ========================================= */
 
+    const shibaButton =
+        document.getElementById("shibaButton");
 
-    // -------------------------
-    // SHOP
-    // -------------------------
+    if (shibaButton) {
+        shibaButton.addEventListener(
+            "click",
+            function () {
+                if (game.energy < 1) {
+                    showToast(
+                        "⚡ Not enough energy"
+                    );
+                    return;
+                }
+
+                const vip = getVIP();
+
+                const bonus =
+                    1 + vip.mining / 100;
+
+                const earned =
+                    game.tapPower * bonus;
+
+                game.balance += earned;
+                game.totalMined += earned;
+
+                game.energy -= 1;
+
+                addXP(1);
+
+                createEffect(earned);
+
+                updateUI();
+            }
+        );
+    }
+
+    /* =========================================
+       VISUAL MINING EFFECT
+    ========================================= */
+
+    function createEffect(amount) {
+        const effects =
+            document.getElementById("effects");
+
+        if (!effects) {
+            return;
+        }
+
+        const effect =
+            document.createElement("div");
+
+        effect.className = "coin-effect";
+
+        effect.textContent =
+            `+${formatNumber(amount)}`;
+
+        effect.style.left =
+            `${40 + Math.random() * 20}%`;
+
+        effect.style.top =
+            `${45 + Math.random() * 10}%`;
+
+        effects.appendChild(effect);
+
+        setTimeout(function () {
+            effect.remove();
+        }, 1000);
+    }
+
+    /* =========================================
+       ENERGY PACK
+    ========================================= */
 
     const energyPackButton =
         document.getElementById(
@@ -445,40 +571,39 @@ document.addEventListener("DOMContentLoaded", () => {
         );
 
     if (energyPackButton) {
-
         energyPackButton.addEventListener(
             "click",
-            () => {
+            function () {
+                const price = 250;
 
-                if (balance < 250) {
-
+                if (game.balance < price) {
                     showToast(
                         "❌ Not enough BSHIB"
                     );
-
                     return;
-
                 }
 
-                balance -= 250;
+                game.balance -= price;
 
-                energy =
+                game.energy =
                     Math.min(
-                        maxEnergy,
-                        energy + 250
+                        game.maxEnergy,
+                        game.energy + 250
                     );
 
-                updateScreen();
-
                 showToast(
-                    "⚡ Energy restored"
+                    "⚡ Energy Pack activated"
                 );
 
+                updateUI();
+                saveGame();
             }
         );
-
     }
 
+    /* =========================================
+       MINING BOOST
+    ========================================= */
 
     const miningBoostButton =
         document.getElementById(
@@ -486,131 +611,119 @@ document.addEventListener("DOMContentLoaded", () => {
         );
 
     if (miningBoostButton) {
-
         miningBoostButton.addEventListener(
             "click",
-            () => {
+            function () {
+                const price = 500;
 
-                if (balance < 500) {
-
+                if (game.balance < price) {
                     showToast(
                         "❌ Not enough BSHIB"
                     );
-
                     return;
-
                 }
 
-                balance -= 500;
+                game.balance -= price;
 
-                tapPower++;
-
-                miningRate =
-                    tapPower;
-
-                updateScreen();
+                game.tapPower += 1;
 
                 showToast(
-                    "🚀 Mining Power upgraded"
+                    `⛏️ Mining Power +1`
                 );
 
+                updateUI();
+                saveGame();
             }
         );
-
     }
 
-
-    // -------------------------
-    // VIP
-    // -------------------------
+    /* =========================================
+       VIP PURCHASE
+    ========================================= */
 
     const vipButtons =
         document.querySelectorAll(
             ".vip-buy-btn"
         );
 
-    vipButtons.forEach(
-        (button) => {
-
-            button.addEventListener(
-                "click",
-                () => {
-
-                    const vip =
-                        Number(
-                            button.dataset.vip
-                        );
-
-                    const prices = {
-
-                        1: 10000,
-                        2: 50000,
-                        3: 150000,
-                        4: 400000,
-                        5: 1000000
-
-                    };
-
-                    const price =
-                        prices[vip];
-
-                    if (
-                        !price ||
-                        balance < price
-                    ) {
-
-                        showToast(
-                            "❌ Not enough BSHIB"
-                        );
-
-                        return;
-
-                    }
-
-                    if (
-                        vip <= vipLevel
-                    ) {
-
-                        showToast(
-                            "Already activated"
-                        );
-
-                        return;
-
-                    }
-
-                    balance -= price;
-
-                    vipLevel = vip;
-
-                    maxEnergy =
-                        1000 +
-                        vipLevel * 100;
-
-                    energy =
-                        Math.min(
-                            energy,
-                            maxEnergy
-                        );
-
-                    updateScreen();
-
-                    showToast(
-                        "👑 VIP " +
-                        vip +
-                        " activated"
+    vipButtons.forEach(function (button) {
+        button.addEventListener(
+            "click",
+            function () {
+                const requestedVIP =
+                    Number(
+                        button.getAttribute(
+                            "data-vip"
+                        )
                     );
 
+                if (
+                    !Number.isFinite(requestedVIP) ||
+                    requestedVIP < 1 ||
+                    requestedVIP > 5
+                ) {
+                    return;
                 }
-            );
 
-        }
-    );
+                if (
+                    requestedVIP <= game.vipLevel
+                ) {
+                    showToast(
+                        "⭐ You already have this VIP level"
+                    );
+                    return;
+                }
 
+                if (
+                    requestedVIP !==
+                    game.vipLevel + 1
+                ) {
+                    showToast(
+                        "🔒 Upgrade VIP levels in order"
+                    );
+                    return;
+                }
 
-    // -------------------------
-    // DAILY VIP REWARD
-    // -------------------------
+                const price =
+                    VIP_PRICES[requestedVIP];
+
+                if (game.balance < price) {
+                    showToast(
+                        "❌ Not enough BSHIB"
+                    );
+                    return;
+                }
+
+                game.balance -= price;
+
+                game.vipLevel =
+                    requestedVIP;
+
+                const vip =
+                    getVIP();
+
+                game.maxEnergy =
+                    1000 + vip.energy;
+
+                game.energy =
+                    Math.min(
+                        game.maxEnergy,
+                        game.energy + vip.energy
+                    );
+
+                showToast(
+                    `👑 VIP ${requestedVIP} activated`
+                );
+
+                updateUI();
+                saveGame();
+            }
+        );
+    });
+
+    /* =========================================
+       DAILY VIP REWARD
+    ========================================= */
 
     const vipRewardButton =
         document.getElementById(
@@ -618,68 +731,93 @@ document.addEventListener("DOMContentLoaded", () => {
         );
 
     if (vipRewardButton) {
-
         vipRewardButton.addEventListener(
             "click",
-            () => {
+            function () {
+                const now =
+                    Date.now();
+
+                const DAY =
+                    24 * 60 * 60 * 1000;
+
+                if (
+                    game.lastDailyReward &&
+                    now -
+                        game.lastDailyReward <
+                        DAY
+                ) {
+                    showToast(
+                        "⏳ Daily reward already claimed"
+                    );
+                    return;
+                }
 
                 const reward =
-                    100 * (vipLevel + 1);
+                    100 *
+                    (game.vipLevel + 1);
 
-                balance += reward;
+                game.balance += reward;
 
-                updateScreen();
+                game.lastDailyReward =
+                    now;
 
                 showToast(
-                    "🎁 +" +
-                    reward +
-                    " BSHIB"
+                    `🎁 +${formatNumber(
+                        reward
+                    )} BSHIB`
                 );
 
+                updateUI();
+                saveGame();
             }
         );
-
     }
 
-
-    // -------------------------
-    // REFERRAL
-    // -------------------------
+    /* =========================================
+       REFERRAL COPY
+    ========================================= */
 
     const copyReferral =
         document.getElementById(
             "copyReferral"
         );
 
-    if (copyReferral) {
-
-        copyReferral.addEventListener(
-            "click",
-            async () => {
-
-                try {
-
-                    await navigator.clipboard.writeText(
-                        "BSHIB"
-                    );
-
-                    showToast(
-                        "📋 Referral copied"
-                    );
-
-                } catch (error) {
-
-                    showToast(
-                        "Referral: BSHIB"
-                    );
-
-                }
-
-            }
+    const referralCode =
+        document.getElementById(
+            "referralCode"
         );
 
+    if (
+        copyReferral &&
+        referralCode
+    ) {
+        copyReferral.addEventListener(
+            "click",
+            async function () {
+                const text =
+                    referralCode.textContent ||
+                    "";
+
+                try {
+                    await navigator.clipboard.writeText(
+                        text
+                    );
+
+                    showToast(
+                        "📋 Referral code copied"
+                    );
+                } catch (e) {
+                    showToast(
+                        "📋 Copy failed"
+                    );
+                }
+            }
+        );
     }
 
+    /* =========================================
+       INVITE FRIENDS
+    ========================================= */
 
     const inviteFriends =
         document.getElementById(
@@ -687,79 +825,175 @@ document.addEventListener("DOMContentLoaded", () => {
         );
 
     if (inviteFriends) {
-
         inviteFriends.addEventListener(
             "click",
-            () => {
+            function () {
+                const code =
+                    referralCode
+                        ? referralCode.textContent
+                        : "";
 
-                const text =
-                    encodeURIComponent(
-                        "Join Baby Shiba Inu 🐕 $BSHIB"
-                    );
+                const message =
+                    `Join Baby Shiba Inu 🐕🔥\n\n` +
+                    `Mine BSHIB and build your journey.\n\n` +
+                    `Referral: ${code}`;
 
                 const url =
-                    "https://t.me/share/url?url=&text=" +
-                    text;
+                    `https://t.me/share/url?url=${encodeURIComponent(
+                        "https://t.me/shibababycoinbot"
+                    )}&text=${encodeURIComponent(
+                        message
+                    )}`;
 
-                window.open(
-                    url,
-                    "_blank"
-                );
+                if (
+                    tg &&
+                    typeof tg.openTelegramLink ===
+                        "function"
+                ) {
+                    try {
+                        tg.openTelegramLink(url);
+                        return;
+                    } catch (e) {}
+                }
 
+                try {
+                    window.open(
+                        url,
+                        "_blank"
+                    );
+                } catch (e) {
+                    window.location.href =
+                        url;
+                }
             }
         );
-
     }
 
+    /* =========================================
+       NAVIGATION EVENTS
+    ========================================= */
 
-    // -------------------------
-    // TOAST
-    // -------------------------
+    const navItems =
+        document.querySelectorAll(
+            ".nav-item"
+        );
+
+    navItems.forEach(function (item) {
+        item.addEventListener(
+            "click",
+            function () {
+                const page =
+                    item.getAttribute(
+                        "data-page"
+                    );
+
+                if (page) {
+                    showPage(page);
+                }
+            }
+        );
+    });
+
+    /* =========================================
+       TOAST
+    ========================================= */
 
     function showToast(message) {
+        const toast =
+            document.getElementById("toast");
 
-        if (!toastEl) return;
+        if (!toast) {
+            return;
+        }
 
-        toastEl.textContent =
+        toast.textContent =
             message;
 
-        toastEl.classList.add(
-            "show"
+        toast.classList.add("show");
+
+        clearTimeout(
+            showToast.timer
         );
 
-        setTimeout(() => {
+        showToast.timer =
+            setTimeout(function () {
+                toast.classList.remove(
+                    "show"
+                );
+            }, 2200);
+    }
 
-            toastEl.classList.remove(
-                "show"
+    /* =========================================
+       AUTOMATIC MINING
+       SAME AS ORIGINAL MINING GAME
+    ========================================= */
+
+    setInterval(function () {
+        if (game.energy <= 0) {
+            return;
+        }
+
+        const vip = getVIP();
+
+        const bonus =
+            1 + vip.mining / 100;
+
+        const earned =
+            game.mineRate * bonus;
+
+        game.balance += earned;
+
+        game.totalMined += earned;
+
+        game.energy =
+            Math.max(
+                0,
+                game.energy - 1
             );
 
-        }, 1800);
+        addXP(1);
 
-    }
+        updateUI();
+    }, 1000);
 
+    /* =========================================
+       ENERGY RECHARGE
+       SAME AS ORIGINAL MINING GAME
+    ========================================= */
 
-    // -------------------------
-    // NUMBER FORMAT
-    // -------------------------
+    setInterval(function () {
+        if (
+            game.energy <
+            game.maxEnergy
+        ) {
+            game.energy =
+                Math.min(
+                    game.maxEnergy,
+                    game.energy + 1
+                );
 
-    function formatNumber(number) {
+            updateUI();
+        }
+    }, 3000);
 
-        return Number(
-            number
-        ).toLocaleString(
-            "en-US",
-            {
-                maximumFractionDigits: 2
-            }
-        );
+    /* =========================================
+       AUTO SAVE
+       SAME AS ORIGINAL MINING GAME
+    ========================================= */
 
-    }
+    setInterval(function () {
+        saveGame();
+    }, 5000);
 
+    /* =========================================
+       INITIALIZE
+    ========================================= */
 
-    // -------------------------
-    // INITIALIZE
-    // -------------------------
+    loadGame();
 
-    updateScreen();
+    loadTelegramUser();
 
+    updateVIP();
+
+    updateUI();
 });
