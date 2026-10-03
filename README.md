@@ -1,1 +1,1 @@
-# baby-shiba-inu-android
+Baby Shiba Inu Android Game - $BSHIB
