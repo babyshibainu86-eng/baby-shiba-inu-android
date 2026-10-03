@@ -27,7 +27,7 @@
 
             <div class="intro-logo">
                 <img
-                    src="file_00000000475481f4afc8aeaecd6da9b6.png"
+                    src="assets/bshib-logo.png"
                     alt="Baby Shiba Inu"
                 >
             </div>
@@ -173,7 +173,7 @@
                     >
 
                         <img
-                            src="file_00000000475481f4afc8aeaecd6da9b6.png"
+                            src="assets/bshib-logo.png"
                             alt="BSHIB"
                         >
 
@@ -841,4 +841,4 @@
 <script src="app.js"></script>
 
 </body>
-          </html>
+</html>
