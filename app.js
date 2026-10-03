@@ -459,34 +459,34 @@ document.addEventListener("DOMContentLoaded", function () {
     ========================================= */
 
     const startGame =
-        document.getElementById("startGame");
+    document.getElementById("startGame");
 
-    if (startGame) {
-        startGame.addEventListener(
-            "click",
-            function () {
-                const introPage =
-                    document.getElementById("introPage");
+if (startGame) {
+    startGame.addEventListener(
+        "click",
+        function () {
+            const introPage =
+                document.getElementById("introPage");
 
-                const gameApp =
-                    document.getElementById("gameApp");
+            const gameApp =
+                document.getElementById("gameApp");
 
-                if (introPage) {
-                    introPage.style.display = "none";
-                }
-
-                if (gameApp) {
-                    gameApp.style.display = "block";
-                }
-
-                try {
-                    window.scrollTo(0, 0);
-                } catch (e) {}
-
-                updateUI();
+            if (introPage) {
+                introPage.style.display = "none";
             }
-        );
-    }
+
+            if (gameApp) {
+                gameApp.classList.remove("hidden");
+            }
+
+            try {
+                window.scrollTo(0, 0);
+            } catch (e) {}
+
+            updateUI();
+        }
+    );
+}
 
     /* =========================================
        MINING / TAP
